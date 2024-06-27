@@ -288,7 +288,7 @@ ggplot(combined_data, aes(x = Region, y = Number_of_Inheritors)) +
   labs(title = "2020년 지역별 피상속인수", x = "지역", y = "피상속인수") +
   theme_minimal() +
   theme(
-    plot.title = element_text(hjust = 0.5, size = 40, face = "bold"),
+    plot.title = element_text(hjust = 0.5, size = 30, face = "bold"),
     axis.title.x = element_text(size = 20, face = "bold"),
     axis.title.y = element_text(size = 20, face = "bold"),
     axis.text.x = element_text(angle = 45, hjust = 1, size = 10),
