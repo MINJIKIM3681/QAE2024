@@ -1,0 +1,412 @@
+---
+title: "상속세 신고 현황(2018-2022년)"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: rows
+    date: "2024-06-25"
+---
+
+
+Page 1
+=====================================  
+
+Row {data-height=650}
+-------------------------------------
+
+
+### 상속세 신고 현황(2018-2022년)
+
+
+```{r}
+library(readxl)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+
+# 엑셀 파일 경로 설정
+file_path <- "F:/0. 성균관대/3. 경제데이터분석입문_최재성/기말프로젝트/최종/5개년상속세신고현황.xlsx"
+
+# 엑셀 파일 읽기
+combined_data <- read_excel(file_path)
+
+# 데이터 롱 포맷으로 변환
+long_data <- combined_data %>%
+  pivot_longer(cols = -c(Year, 연도), names_to = "Metric", values_to = "value")
+
+# 연도 컬럼을 팩터로 변환
+long_data$Year <- as.factor(long_data$Year)
+
+# 바 그래프 생성
+p_combined <- ggplot(long_data, aes(x = 연도, y = value, fill = Metric)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(title = "5개년 상속세 신고현황", x = "연도", y = "금액") +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 20, face = "bold"),
+    axis.title.x = element_text(size = 15, face = "bold"),
+    axis.title.y = element_text(size = 15, face = "bold"),
+    axis.text.x = element_text(size = 12),
+    axis.text.y = element_text(size = 12),
+    legend.title = element_text(size = 15),
+    legend.text = element_text(size = 12)
+  ) +
+  scale_fill_brewer(palette = "Pastel1")
+
+# 그래프 출력
+print(p_combined)
+
+
+```
+   
+
+
+### 상속세 최신 뉴스
+
+```{r}
+library(dplyr)
+library(stringr)
+library(httr)
+library(XML)
+library(knitr)
+library(kableExtra)
+
+# XML로 받기
+## 날짜 및 시간 설정
+now <- Sys.time()
+today <- format(Sys.time(), "%Y.%m.%d.")
+
+searchUrl <- "https://openapi.naver.com/v1/search/news.xml"
+client_id <- "AgdnRm8qVEFAWq44oMB7"
+client_secret <- "GWkuy4Bgkc"
+
+search.word <- "상속세"
+query <- URLencode(enc2utf8(search.word))
+url <- str_c(searchUrl, "?query=", query, "&display=20")
+
+res <- GET(url, 
+           add_headers("X-Naver-Client-Id" = client_id, 
+                       "X-Naver-Client-Secret" = client_secret))
+doc <- content(res, as = "text")
+
+# 뉴스 Dataframe 생성
+xmlFile <- xmlParse(doc)
+selected.nodes <- getNodeSet(xmlFile, "//item")
+
+# 각 노드에서 데이터 추출
+titles <- sapply(selected.nodes, function(x) xmlValue(xmlChildren(x)$title))
+links <- sapply(selected.nodes, function(x) xmlValue(xmlChildren(x)$link))
+descriptions <- sapply(selected.nodes, function(x) xmlValue(xmlChildren(x)$description))
+
+# 불필요한 HTML 태그 제거
+descriptions <- descriptions %>% 
+  str_remove_all("<.*?>") %>% 
+  str_remove_all("&quot;")
+
+# Dataframe 생성
+df <- data.frame(
+  NO. = 1:length(titles),
+  Title = titles,
+  Link = links,
+  Description = descriptions,
+  stringsAsFactors = FALSE
+)
+
+# 뉴스 데이터 테이블 출력
+df %>% 
+  head(20) %>% 
+  mutate(Title = cell_spec(Title, "html", link = Link, color="#062872")) %>%
+  select(NO., Title, Description) %>%
+  kable(format = "html", escape = FALSE, col.names = c("NO.", "Title", "Description")) %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive")) %>%
+  column_spec(1, bold = TRUE, color = "white", background = "#3E64FF") %>%
+  column_spec(2, width = "40em") %>%
+  column_spec(3, width = "30em") %>%
+  row_spec(0, bold = TRUE, color = "white", background = "#4CAF50") %>%
+  row_spec(1:20, background = "#E6F7FF") %>%
+  add_header_above(c("뉴스 정보" = 3)) %>%
+  footnote(general = "Data collected from Naver News API", general_title = "Note: ", footnote_as_chunk = TRUE, title_format = c("bold", "italic"))
+
+
+```   
+ 
+
+
+Page 2 {data-orientation=rows}
+=====================================     
+   
+Row {data-height=400}
+-------------------------------------
+
+### 2022년 지역별 피상속인수
+
+```{r}
+##2022년
+# 필요한 패키지 로드
+library(readxl)
+library(dplyr)
+library(ggplot2)
+library(stringr)
+library(shiny)
+
+
+# 엑셀 파일 경로 설정
+file_path <- "F:/0. 성균관대/3. 경제데이터분석입문_최재성/기말프로젝트/3차/2022_상속세_신고_현황Ⅰ(납세지).xlsx"
+
+# 1. 엑셀 파일에서 A열과 B열 불러오기
+data <- read_excel(file_path, range = "A6:B22", col_names = FALSE)
+
+# 컬럼 이름 지정
+names(data) <- c("Column_A", "Column_B")
+
+# Column_B를 숫자로 변환
+data$Column_B <- as.numeric(gsub(",", "", data$Column_B))
+
+# 2. 불러온 열 합치기
+merged_column <- paste(data$Column_A, data$Column_B)
+
+# 3. 그래프로 만들기
+# 새로운 데이터프레임 생성
+merged_data <- data.frame(A_B = merged_column, stringsAsFactors = FALSE)
+
+# 4. 지역별 피상속인수 그래프 생성
+# 데이터 이름 지정
+combined_data <- data
+names(combined_data) <- c("Region", "Number_of_Inheritors")
+
+# 바 그래프 생성 및 꾸미기
+ggplot(combined_data, aes(x = Region, y = Number_of_Inheritors)) +
+  geom_bar(stat = "identity", fill = "coral", color = "black") +
+  geom_text(aes(label = Number_of_Inheritors), vjust = -0.5, color = "black", size = 3.5) +
+  labs(title = "2022년 지역별 피상속인수", x = "지역", y = "피상속인수") +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 30, face = "bold"),
+    axis.title.x = element_text(size = 20, face = "bold"),
+    axis.title.y = element_text(size = 20, face = "bold"),
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 10),
+    axis.text.y = element_text(size = 20),
+    panel.grid.major = element_line(color = "gray80"),
+    panel.grid.minor = element_blank()
+  ) +
+  scale_y_continuous(expand = c(0, 0)) +
+  scale_x_discrete(labels = function(x) str_wrap(x, width = 200))
+
+```
+
+### 2021년 지역별 피상속인수
+
+```{r}
+##2021년
+# 필요한 패키지 로드
+library(readxl)
+library(dplyr)
+library(ggplot2)
+library(stringr)
+
+# 엑셀 파일 경로 설정
+file_path <- "F:/0. 성균관대/3. 경제데이터분석입문_최재성/기말프로젝트/3차/2021_상속세_신고_현황Ⅰ(납세지).xlsx"
+
+# 1. 엑셀 파일에서 A열과 B열 불러오기
+data <- read_excel(file_path, range = "A6:B22", col_names = FALSE)
+
+# 컬럼 이름 지정
+names(data) <- c("Column_A", "Column_B")
+
+# Column_B를 숫자로 변환
+data$Column_B <- as.numeric(gsub(",", "", data$Column_B))
+
+# 2. 불러온 열 합치기
+merged_column <- paste(data$Column_A, data$Column_B)
+
+# 3. 그래프로 만들기
+# 새로운 데이터프레임 생성
+merged_data <- data.frame(A_B = merged_column, stringsAsFactors = FALSE)
+
+# 4. 지역별 피상속인수 그래프 생성
+# 데이터 이름 지정
+combined_data <- data
+names(combined_data) <- c("Region", "Number_of_Inheritors")
+
+# 바 그래프 생성 및 꾸미기
+ggplot(combined_data, aes(x = Region, y = Number_of_Inheritors)) +
+  geom_bar(stat = "identity", fill = "coral", color = "black") +
+  geom_text(aes(label = Number_of_Inheritors), vjust = -0.5, color = "black", size = 3.5) +
+  labs(title = "2021년 지역별 피상속인수", x = "지역", y = "피상속인수") +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 30, face = "bold"),
+    axis.title.x = element_text(size = 20, face = "bold"),
+    axis.title.y = element_text(size = 20, face = "bold"),
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 10),
+    axis.text.y = element_text(size = 20),
+    panel.grid.major = element_line(color = "gray80"),
+    panel.grid.minor = element_blank()
+  ) +
+  scale_y_continuous(expand = c(0, 0)) +
+  scale_x_discrete(labels = function(x) str_wrap(x, width = 200))
+
+```   
+    
+### 2020년 지역별 피상속인수
+
+```{r}
+##2020년
+# 필요한 패키지 로드
+library(readxl)
+library(dplyr)
+library(ggplot2)
+library(stringr)
+
+# 엑셀 파일 경로 설정
+file_path <- "F:/0. 성균관대/3. 경제데이터분석입문_최재성/기말프로젝트/3차/2020_상속세_신고_현황Ⅰ(납세지).xlsx"
+
+# 1. 엑셀 파일에서 A열과 B열 불러오기
+data <- read_excel(file_path, range = "A6:B22", col_names = FALSE)
+
+# 컬럼 이름 지정
+names(data) <- c("Column_A", "Column_B")
+
+# Column_B를 숫자로 변환
+data$Column_B <- as.numeric(gsub(",", "", data$Column_B))
+
+# 2. 불러온 열 합치기
+merged_column <- paste(data$Column_A, data$Column_B)
+
+# 3. 그래프로 만들기
+# 새로운 데이터프레임 생성
+merged_data <- data.frame(A_B = merged_column, stringsAsFactors = FALSE)
+
+# 4. 지역별 피상속인수 그래프 생성
+# 데이터 이름 지정
+combined_data <- data
+names(combined_data) <- c("Region", "Number_of_Inheritors")
+
+# 바 그래프 생성 및 꾸미기
+ggplot(combined_data, aes(x = Region, y = Number_of_Inheritors)) +
+  geom_bar(stat = "identity", fill = "coral", color = "black") +
+  geom_text(aes(label = Number_of_Inheritors), vjust = -0.5, color = "black", size = 3.5) +
+  labs(title = "2020년 지역별 피상속인수", x = "지역", y = "피상속인수") +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 30, face = "bold"),
+    axis.title.x = element_text(size = 20, face = "bold"),
+    axis.title.y = element_text(size = 20, face = "bold"),
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 10),
+    axis.text.y = element_text(size = 20),
+    panel.grid.major = element_line(color = "gray80"),
+    panel.grid.minor = element_blank()
+  ) +
+  scale_y_continuous(expand = c(0, 0)) +
+  scale_x_discrete(labels = function(x) str_wrap(x, width = 200))
+
+```
+
+Row {data-height=400}
+-------------------------------------
+### 2019년 지역별 피상속인수
+
+```{r}
+##2019년
+# 필요한 패키지 로드
+library(readxl)
+library(dplyr)
+library(ggplot2)
+library(stringr)
+
+# 엑셀 파일 경로 설정
+file_path <- "F:/0. 성균관대/3. 경제데이터분석입문_최재성/기말프로젝트/3차/2019_상속세_신고_현황Ⅰ(납세지).xlsx"
+
+# 1. 엑셀 파일에서 A열과 B열 불러오기
+data <- read_excel(file_path, range = "A6:B22", col_names = FALSE)
+
+# 컬럼 이름 지정
+names(data) <- c("Column_A", "Column_B")
+
+# Column_B를 숫자로 변환
+data$Column_B <- as.numeric(gsub(",", "", data$Column_B))
+
+# 2. 불러온 열 합치기
+merged_column <- paste(data$Column_A, data$Column_B)
+
+# 3. 그래프로 만들기
+# 새로운 데이터프레임 생성
+merged_data <- data.frame(A_B = merged_column, stringsAsFactors = FALSE)
+
+# 4. 지역별 피상속인수 그래프 생성
+# 데이터 이름 지정
+combined_data <- data
+names(combined_data) <- c("Region", "Number_of_Inheritors")
+
+# 바 그래프 생성 및 꾸미기
+ggplot(combined_data, aes(x = Region, y = Number_of_Inheritors)) +
+  geom_bar(stat = "identity", fill = "skyblue", color = "black") +
+  geom_text(aes(label = Number_of_Inheritors), vjust = -0.5, color = "black", size = 3.5) +
+  labs(title = "2019년 지역별 피상속인수", x = "지역", y = "피상속인수") +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 40, face = "bold"),
+    axis.title.x = element_text(size = 20, face = "bold"),
+    axis.title.y = element_text(size = 20, face = "bold"),
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 10),
+    axis.text.y = element_text(size = 20),
+    panel.grid.major = element_line(color = "gray80"),
+    panel.grid.minor = element_blank()
+  ) +
+  scale_y_continuous(expand = c(0, 0)) +
+  scale_x_discrete(labels = function(x) str_wrap(x, width = 200))
+
+```
+
+### 2018년 지역별 피상속인수
+
+```{r}
+##2018년
+# 필요한 패키지 로드
+library(readxl)
+library(dplyr)
+library(ggplot2)
+library(stringr)
+
+# 엑셀 파일 경로 설정
+file_path <- "F:/0. 성균관대/3. 경제데이터분석입문_최재성/기말프로젝트/3차/2018_상속세_신고_현황Ⅰ(납세지).xlsx"
+
+# 1. 엑셀 파일에서 A열과 B열 불러오기
+data <- read_excel(file_path, range = "A6:B22", col_names = FALSE)
+
+# 컬럼 이름 지정
+names(data) <- c("Column_A", "Column_B")
+
+# Column_B를 숫자로 변환
+data$Column_B <- as.numeric(gsub(",", "", data$Column_B))
+
+# 2. 불러온 열 합치기
+merged_column <- paste(data$Column_A, data$Column_B)
+
+# 3. 그래프로 만들기
+# 새로운 데이터프레임 생성
+merged_data <- data.frame(A_B = merged_column, stringsAsFactors = FALSE)
+
+
+# 4. 지역별 피상속인수 그래프 생성
+# 데이터 이름 지정
+combined_data <- data
+names(combined_data) <- c("Region", "Number_of_Inheritors")
+
+# 바 그래프 생성 및 꾸미기
+ggplot(combined_data, aes(x = Region, y = Number_of_Inheritors)) +
+  geom_bar(stat = "identity", fill = "skyblue", color = "black") +
+  geom_text(aes(label = Number_of_Inheritors), vjust = -0.5, color = "black", size = 3.5) +
+  labs(title = "2018년 지역별 피상속인수", x = "지역", y = "피상속인수") +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 40, face = "bold"),
+    axis.title.x = element_text(size = 20, face = "bold"),
+    axis.title.y = element_text(size = 20, face = "bold"),
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 10),
+    axis.text.y = element_text(size = 20),
+    panel.grid.major = element_line(color = "gray80"),
+    panel.grid.minor = element_blank()
+  ) +
+  scale_y_continuous(expand = c(0, 0)) +
+  scale_x_discrete(labels = function(x) str_wrap(x, width = 200))
+```   
